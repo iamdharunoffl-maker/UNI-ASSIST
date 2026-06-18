@@ -15,7 +15,8 @@ dist/
 # Backup folder
 backups/
 
-# SQLite temporary files
+# SQLite Database
+server/database/*.db
 server/database/*.db-shm
 server/database/*.db-wal
 server/database/*.sqbpro
