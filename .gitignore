@@ -1,1 +1,26 @@
-node_modules/**/node_modules/client/dist/dist/*.log.vscode/backups/server/database/*.db-shmserver/database/*.db-walserver/database/*.sqbpro.envserver/.envclient/.env
+# Node modules
+node_modules/
+**/node_modules/
+
+# Build output
+client/dist/
+dist/
+
+# Logs
+*.log
+
+# VS Code
+.vscode/
+
+# Backup folder
+backups/
+
+# SQLite temporary files
+server/database/*.db-shm
+server/database/*.db-wal
+server/database/*.sqbpro
+
+# Environment files
+.env
+server/.env
+client/.env
