@@ -1,48 +1,103 @@
-const jwt = require('jsonwebtoken');
-const { getUserByUsername } = require('../services/databaseService');
+const jwt = require("jsonwebtoken");
+const { getUserByUsername } = require("../services/databaseService");
 
 const auth = async (req, res, next) => {
-  const token = req.cookies.token;
-
-  if (!token) {
-    return res.status(401).json({ message: 'Authentication required. Please log in.' });
-  }
-
   try {
+    console.log("========================================");
+    console.log("AUTH MIDDLEWARE");
+    console.log("Cookies:", req.cookies);
+
+    const token = req.cookies?.token;
+
+    console.log("Token:", token);
+
+    if (!token) {
+      console.log("No token received.");
+
+      return res.status(401).json({
+        message: "Authentication required."
+      });
+    }
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
 
-    // Attach fresh user record including must_change_password and role from DB
-    try {
-      const userRecord = await getUserByUsername(req.user.username);
-      if (userRecord) {
-        req.user.must_change_password = !!userRecord.must_change_password;
-        req.user.role = userRecord.role || req.user.role;
-      }
-    } catch (e) {
-      // If DB lookup fails, treat as unauthorized
-      res.clearCookie('token');
-      return res.status(401).json({ message: 'Authentication failed.' });
+    console.log("Decoded Token:", decoded);
+
+    const user = await getUserByUsername(decoded.username);
+
+    if (!user) {
+      console.log("User not found.");
+
+      res.clearCookie("token", {
+        httpOnly: true,
+        secure: true,
+        sameSite: "none",
+        path: "/"
+      });
+
+      return res.status(401).json({
+        message: "User not found."
+      });
     }
 
-    // Enforce password change before allowing access to protected routes
-    const allowedPaths = ['/api/auth/change-password', '/api/auth/logout', '/api/auth/me'];
-    if (req.user.must_change_password && !allowedPaths.includes(req.originalUrl)) {
-      return res.status(403).json({ message: 'Password change required. Please change your password before continuing.' });
+    req.user = {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      must_change_password: !!user.must_change_password
+    };
+
+    console.log("Authenticated:", req.user.username);
+
+    // Allow these routes even if password must be changed
+    const allowedRoutes = [
+      "/api/auth/change-password",
+      "/api/auth/logout",
+      "/api/auth/me"
+    ];
+
+    if (
+      req.user.must_change_password &&
+      !allowedRoutes.includes(req.originalUrl)
+    ) {
+      return res.status(403).json({
+        message:
+          "Password change required. Please change your password first."
+      });
     }
+
     next();
-  } catch (error) {
-    res.clearCookie('token');
-    return res.status(401).json({ message: 'Invalid or expired session. Please log in again.' });
+
+  } catch (err) {
+    console.error("AUTH ERROR:", err.message);
+
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      path: "/"
+    });
+
+    return res.status(401).json({
+      message: "Invalid or expired token."
+    });
   }
 };
 
 const adminOnly = (req, res, next) => {
-  if (req.user && req.user.role === 'admin') {
-    next();
-  } else {
-    return res.status(403).json({ message: 'Access denied. Administrator privileges required.' });
+  if (!req.user) {
+    return res.status(401).json({
+      message: "Authentication required."
+    });
   }
+
+  if (req.user.role !== "admin") {
+    return res.status(403).json({
+      message: "Admin access only."
+    });
+  }
+
+  next();
 };
 
 module.exports = {
