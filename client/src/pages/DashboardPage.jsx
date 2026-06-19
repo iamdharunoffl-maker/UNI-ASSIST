@@ -76,7 +76,7 @@ export const DashboardPage = () => {
             CRM Portal Overview
           </h2>
           <p className="text-xs text-slate-400 font-sans max-w-md">
-            Consultancy admissions and leads dashboard. Synchronized directly with Excel local database storage.
+            Consultancy admissions and leads dashboard. Track inquires, student enrollments, and university affiliations in one place.
           </p>
         </div>
         <button
