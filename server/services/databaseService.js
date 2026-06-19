@@ -151,24 +151,61 @@ const initializeDb = async () => {
     console.warn('Status repair migration encountered an issue:', e.message || e);
   }
 
-  // Seed admin user if none exist. Use environment variables for username/password.
-  const userRow = await conn.get('SELECT COUNT(1) as cnt FROM users');
-  if (userRow && userRow.cnt === 0) {
-    const adminUser = process.env.DEFAULT_ADMIN_USERNAME;
-    const adminPass = process.env.DEFAULT_ADMIN_PASSWORD;
-    if (adminUser && adminPass) {
-      const salt = bcrypt.genSaltSync(10);
-      const hash = bcrypt.hashSync(adminPass, salt);
-      // Force first-login password change by default
-      await conn.run(
-        'INSERT INTO users (username, password, role, createdAt, must_change_password) VALUES (?, ?, ?, ?, ?)',
-        [adminUser, hash, 'admin', new Date().toISOString(), 1]
-      );
-      console.log('Default admin user seeded. PLEASE change the password on first login.');
-    } else {
-      console.warn('No admin user found and DEFAULT_ADMIN_USERNAME/DEFAULT_ADMIN_PASSWORD not set. Skipping admin seed.');
-    }
+  // Always ensure the default admin exists and has the configured password
+const adminUser = process.env.DEFAULT_ADMIN_USERNAME;
+const adminPass = process.env.DEFAULT_ADMIN_PASSWORD;
+
+if (adminUser && adminPass) {
+  const existing = await conn.get(
+    'SELECT * FROM users WHERE username = ?',
+    [adminUser]
+  );
+
+  const salt = bcrypt.genSaltSync(10);
+  const hash = bcrypt.hashSync(adminPass, salt);
+
+  if (!existing) {
+    await conn.run(
+      `INSERT INTO users
+      (username, password, role, createdAt, must_change_password)
+      VALUES (?, ?, ?, ?, ?)`,
+      [
+        adminUser,
+        hash,
+        'admin',
+        new Date().toISOString(),
+        0
+      ]
+    );
+
+    console.log('✅ Admin user created.');
+  } else {
+    await conn.run(
+      `UPDATE users
+       SET password = ?, role = ?, must_change_password = ?
+       WHERE username = ?`,
+      [
+        hash,
+        'admin',
+        0,
+        adminUser
+      ]
+    );
+
+    console.log('✅ Admin password reset.');
   }
+
+  const users = await conn.all(
+    'SELECT id, username, role, must_change_password FROM users'
+  );
+
+  console.log('==============================');
+  console.log('USERS IN DATABASE');
+  console.table(users);
+  console.log('==============================');
+} else {
+  console.warn('DEFAULT_ADMIN_USERNAME or DEFAULT_ADMIN_PASSWORD is missing.');
+}
 
   // FIX: Seed default config/settings if empty (was never seeded before)
   const settingRow = await conn.get('SELECT COUNT(1) as cnt FROM settings');
