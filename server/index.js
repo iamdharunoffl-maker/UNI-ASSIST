@@ -35,6 +35,7 @@ if (!process.env.DEFAULT_ADMIN_PASSWORD) {
 }
 
 const app = express();
+app.set("trust proxy", 1);
 const PORT = process.env.PORT || 5000;
 
 // Initialize database and then start server
